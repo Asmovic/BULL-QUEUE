@@ -9,12 +9,13 @@ dotenv.config();
 
 const { REDIS_HOST, REDIS_PORT, REDIS_PASSWORD } = process.env;
 
-const redisOptions = {
+// QUEUE OPTIONS
+const queueOptions = {
   redis: { host: REDIS_HOST, port: REDIS_PORT, password: REDIS_PASSWORD },
 };
 
 // DEFINE QUEUE
-const burgerQueue = new Bull('burger', redisOptions);
+const burgerQueue = new Bull('burger', queueOptions);
 
 // REGISTER PROCESSOR
 burgerQueue.process(async (payload, done) => {
@@ -24,6 +25,7 @@ burgerQueue.process(async (payload, done) => {
     payload.progress(20);
     await sleep(1000);
     // STEP 2
+    if (Math.random() > 0.25) throw new Error('Toast burnt!');
     payload.log('Toast the buns.');
     payload.progress(40);
     await sleep(1000);
@@ -45,8 +47,19 @@ burgerQueue.process(async (payload, done) => {
 });
 
 // ADD JOB TO THE QUEUE
-burgerQueue.add({
-  bun: "🐬",
+const jobs = [...new Array(1)].map((_) => ({
+  bun: '🐬',
   cheese: '🍔',
   toppings: ['🉑', '🥬', '🈹'],
-});
+}));
+
+jobs.forEach((job) => burgerQueue.add(job, { jobId: `Burger#${i + 1}`, attempts: 3, repeat: { cron: "10 * * * * *"}}));
+
+burgerQueue.on("completed", (job)=> {
+  console.log(`${job.id} completed`)
+})
+
+
+burgerQueue.on("failed", (job)=> {
+  console.log(`${job.id} failed`)
+})
